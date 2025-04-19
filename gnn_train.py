@@ -10,14 +10,17 @@ from torch_geometric.data import Data
 from torch_geometric.nn import GAE, GCNConv
 
 
-# GAE Model Definition
+# GAE Model Definition with Learnable Embeddings
 class Encoder(torch.nn.Module):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, num_nodes, embedding_dim, out_channels):
         super().__init__()
-        self.conv1 = GCNConv(in_channels, 64)
+        self.embedding = torch.nn.Embedding(num_nodes, embedding_dim)
+        self.conv1 = GCNConv(embedding_dim, 64)  # Input channels = embedding dim
         self.conv2 = GCNConv(64, out_channels)
 
     def forward(self, x, edge_index):
+        # x input are node indices
+        x = self.embedding(x)  # Look up embeddings
         x = self.conv1(x, edge_index).relu()
         return self.conv2(x, edge_index)
 
@@ -38,23 +41,29 @@ def build_graph_data(events, usdc_decimals=6):
 
     edge_index = torch.tensor(
         [[node_map[src] for src in df.src], [node_map[dst] for dst in df.dst]],
-        dtype=torch.long,
+        dtype=torch.long,  # Ensure it's long type right from creation
     )
     edge_weight = torch.tensor(df.amount_usdc.values, dtype=torch.float)
 
-    # Use identity matrix for node features
+    # Use node indices as features for embedding lookup
     num_nodes = len(node_map)
-    data = Data(x=torch.eye(num_nodes), edge_index=edge_index, edge_weight=edge_weight)
+    node_indices = torch.arange(num_nodes, dtype=torch.long)
+    data = Data(x=node_indices, edge_index=edge_index, edge_weight=edge_weight)
     return data, rev_node_map
 
 
 def train_gae(model, data, optimizer, epochs=50):
     """Train the GAE model."""
+    print(
+        f"Debug: train_gae - data.x dtype={data.x.dtype}, data.edge_index dtype={data.edge_index.dtype}",
+        file=sys.stderr,
+    )
     model.train()
     for epoch in range(epochs):
         optimizer.zero_grad()
         z = model.encode(data.x, data.edge_index)
-        loss = model.recon_loss(z, data.edge_index, data.edge_weight)
+        # Use default recon_loss which handles negative sampling
+        loss = model.recon_loss(z, data.edge_index)
         loss.backward()
         optimizer.step()
         if epoch % 10 == 0:
@@ -63,16 +72,37 @@ def train_gae(model, data, optimizer, epochs=50):
 
 
 def detect_anomalies(model, data, rev_node_map, threshold=0.1):
-    """Use trained GAE to detect anomalies."""
+    """Use trained GAE to detect anomalies and print recon scores."""
+    # Ensure edge_index is of type LongTensor for PyG operations
+    # data.edge_index = data.edge_index.long() # Already ensured in build_graph_data
+    print(
+        f"Debug: detect_anomalies - data.x dtype={data.x.dtype}, data.edge_index dtype={data.edge_index.dtype}",
+        file=sys.stderr,
+    )
     model.eval()
     with torch.no_grad():
         z = model.encode(data.x, data.edge_index)
         recon_weight = model.decoder(z, data.edge_index)
         error = (recon_weight - data.edge_weight).abs()
 
+        print("\nEdge Reconstruction Analysis:", file=sys.stderr)
+        for idx in range(data.num_edges):
+            src_idx = data.edge_index[0, idx].item()
+            dst_idx = data.edge_index[1, idx].item()
+            orig_weight = data.edge_weight[idx].item()
+            recon_w = recon_weight[idx].item()
+            err = error[idx].item()
+            # Print details for all edges, not just anomalies
+            print(
+                f"  - {rev_node_map[src_idx]} -> {rev_node_map[dst_idx]}: "
+                f"Orig: {orig_weight:.2f}, Recon Score: {recon_w:.4f}, Error: {err:.4f}",
+                file=sys.stderr,
+            )
+
+        # Keep anomaly detection logic for reference, but maybe comment out/adjust threshold later
         anomalous_indices = torch.where(error > threshold)[0]
         if anomalous_indices.numel() > 0:
-            print("\nAnomalies Detected:", file=sys.stderr)
+            print(f"\nAnomalies Detected (Error > {threshold}):", file=sys.stderr)
             for idx in anomalous_indices.tolist():
                 src_idx = data.edge_index[0, idx].item()
                 dst_idx = data.edge_index[1, idx].item()
@@ -81,12 +111,14 @@ def detect_anomalies(model, data, rev_node_map, threshold=0.1):
                 err = error[idx].item()
                 print(
                     f"  - {rev_node_map[src_idx]} -> {rev_node_map[dst_idx]}: "
-                    f"Orig: {orig_weight:.2f}, Recon: {recon_w:.2f}, Error: {err:.4f}",
+                    f"Orig: {orig_weight:.2f}, Recon Score: {recon_w:.4f}, Error: {err:.4f}",
                     file=sys.stderr,
                 )
 
 
-def main(batch_interval_secs=60, train_epochs=50, anomaly_threshold=0.1):
+def main(
+    batch_interval_secs=60, train_epochs=50, anomaly_threshold=0.1, embedding_dim=16
+):
     """Main loop: consume events, build graph, train, detect."""
     current_batch = []
     last_batch_time = time.time()
@@ -128,14 +160,25 @@ def main(batch_interval_secs=60, train_epochs=50, anomaly_threshold=0.1):
 
             # Initialize or update model
             if model is None:
-                model = GAE(Encoder(data.num_nodes, 32))  # Embedding size 32
+                print(
+                    f"Initializing GAE model with {data.num_nodes} nodes, embedding_dim={embedding_dim}",
+                    file=sys.stderr,
+                )
+                encoder = Encoder(
+                    data.num_nodes, embedding_dim, 32
+                )  # Output embedding size 32
+                model = GAE(encoder)
                 optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
             else:
                 # Simple approach: Re-initialize for new node set
-                # Advanced: Handle dynamic graphs, node embeddings, etc.
-                if data.num_nodes != model.encoder.conv1.in_channels:
-                    print("Node set changed, re-initializing model.", file=sys.stderr)
-                    model = GAE(Encoder(data.num_nodes, 32))
+                # Check if number of nodes changed, requiring model re-initialization
+                if data.num_nodes != model.encoder.embedding.num_embeddings:
+                    print(
+                        f"Node set changed ({model.encoder.embedding.num_embeddings} -> {data.num_nodes}), re-initializing model.",
+                        file=sys.stderr,
+                    )
+                    encoder = Encoder(data.num_nodes, embedding_dim, 32)
+                    model = GAE(encoder)
                     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
             print("Training GAE model...", file=sys.stderr)

@@ -6,6 +6,10 @@ import sys
 import time
 import json
 from web3 import Web3
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Constants
 USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
@@ -71,9 +75,9 @@ def main():
         )
         sys.exit(1)
 
-    print(f"Connected to Ethereum mainnet provider.")
+    print(f"Connected to Ethereum mainnet provider.", file=sys.stderr)
     usdc_contract = w3.eth.contract(address=USDC_ADDRESS, abi=USDC_ABI_MINIMAL)
-    print(f"Streaming USDC transfers from {USDC_ADDRESS}...")
+    print(f"Streaming USDC transfers from {USDC_ADDRESS}...", file=sys.stderr)
 
     for src, dst, val in stream_transfers(w3, usdc_contract):
         print(json.dumps({"src": src, "dst": dst, "value": val}), flush=True)
@@ -83,7 +87,7 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\nStream interrupted. Exiting.")
+        print("\nStream interrupted. Exiting.", file=sys.stderr)
         sys.exit(0)
     except Exception as e:
         print(f"Fatal error in main loop: {e}", file=sys.stderr)
