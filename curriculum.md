@@ -1,0 +1,13 @@
+Picture the curriculum as a set of riffs you’ll slowly weave into a larger solo.  
+
+Begin by reading the Bitcoin whitepaper alongside chapter 2 of *Mastering Bitcoin*—one hand on the PDF, the other in a notebook where you hash the string “Lonn” a thousand times, chain headers together, and watch how Merkle trees prove inclusion with only a handful of bytes. When those proofs feel obvious you’ll have the core mental groove of “immutability through probability”.
+
+Next, invite real data into the room. Spin up `bitcoinlib` and pull block 800 000 from the main net; parse its header, verify the difficulty target, then locate a coinbase transaction and decode the scriptSig to see who mined it. Write a tiny wallet that generates a Taproot key pair and broadcasts a test‑net transaction so you feel the latency between signature and network gossip. When the test‑net explorer shows your tx, you’ll know the difference between “toy cryptography” and an economic heartbeat. 
+
+After that, slide sideways to smart‑contract land. Ape Framework gives you the most Python‑native entrance: initialise a project, write a ten‑line Vyper ERC‑20, fork Ethereum mainnet at yesterday’s block height, and unit‑test mint, burn, and transfer in a single console session. Then script a Python bot that listens to your contract’s `Transfer` events and reacts—perhaps auto‑minting when balances dip below a threshold—to understand on‑chain/off‑chain choreography.  
+
+When the choreography feels tight, open the door to the full club: connect Ape to an Infura (or Alchemy) endpoint, read live USDC transfers, and stream them into a graph structure with PyTorch Geometric. Train a simple graph autoencoder to reconstruct edge weights; anything with high reconstruction error is your candidate anomaly. Move on to the fresher research—self‑attention over multigraphs, temporal‑graph contrastive learning—and watch how quickly fraud‑patterns light up once distance and time are baked into the embeddings.
+
+Give each movement about a fortnight of focused practice, journal what “trust” means to you at the end of every session, and you’ll notice your questions shifting from *how does the code work?* to *who does the code serve?*—the point where blockchain stops being a fad and becomes a lens for systems thinking.  
+
+Which bar of this solo excites you most right now—the toy chain, the wallet on test‑net, or the graph‑GNN dive? Let’s pick the first milestone and set up your repo together 🎷
