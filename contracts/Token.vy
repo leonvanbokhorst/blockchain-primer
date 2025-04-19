@@ -1,5 +1,5 @@
 # @version ^0.3.7
-ZERO_ADDRESS: constant(address) = 0x0000000000000000000000000000000000000000
+NULL_ADDRESS: constant(address) = 0x0000000000000000000000000000000000000000
 
 event Transfer:
     sender: indexed(address)
@@ -20,12 +20,12 @@ def __init__():
 @external
 def mint(to: address, amount: uint256):
     self.balances[to] += amount
-    log Transfer(ZERO_ADDRESS, to, amount)
+    log Transfer(NULL_ADDRESS, to, amount)
 
 @external
 def burn(amount: uint256):
     self.balances[msg.sender] -= amount
-    log Transfer(msg.sender, ZERO_ADDRESS, amount)
+    log Transfer(msg.sender, NULL_ADDRESS, amount)
 
 @external
 def transfer(to: address, amount: uint256) -> bool:
@@ -34,3 +34,4 @@ def transfer(to: address, amount: uint256) -> bool:
     self.balances[to] += amount
     log Transfer(msg.sender, to, amount)
     return True 
+    
