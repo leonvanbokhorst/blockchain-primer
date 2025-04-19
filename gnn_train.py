@@ -52,7 +52,7 @@ def build_graph_data(events, usdc_decimals=6):
     return data, rev_node_map
 
 
-def train_gae(model, data, optimizer, epochs=50):
+def train_gae(model, data, optimizer, epochs=100):
     """Train the GAE model."""
     print(
         f"Debug: train_gae - data.x dtype={data.x.dtype}, data.edge_index dtype={data.edge_index.dtype}",
@@ -117,7 +117,7 @@ def detect_anomalies(model, data, rev_node_map, threshold=0.1):
 
 
 def main(
-    batch_interval_secs=60, train_epochs=50, anomaly_threshold=0.1, embedding_dim=16
+    batch_interval_secs=60, train_epochs=100, anomaly_threshold=0.1, embedding_dim=16
 ):
     """Main loop: consume events, build graph, train, detect."""
     current_batch = []
