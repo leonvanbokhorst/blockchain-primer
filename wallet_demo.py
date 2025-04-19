@@ -32,12 +32,6 @@ def main():
     # Convert satoshis to BTC
     balance_btc = Decimal(balance_sats) / Decimal("1e8")
     print(f"  Current balance: {balance_btc} BTC ({balance_sats} sats)")
-    if balance_sats == 0:
-        print(
-            "No funds detected. Check your faucet TX or wait for more confirmations.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
     # Print public key for both WalletKey and DbKey, convert to hex if bytes
     try:
         pub = key.key_public
@@ -48,6 +42,7 @@ def main():
     else:
         pub_hex = str(pub)
     print(f"  Public key: {pub_hex}")
+    print(f"  Address: {key.address}")
     print(
         "\nPlease fund this address using a testnet faucet, then press Enter to continue."
     )
