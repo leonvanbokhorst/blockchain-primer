@@ -6,30 +6,61 @@ from bitcoinlib.wallets import wallet_create_or_open
 
 
 def create_taproot_wallet(name: str, mnemonic: str = None):
-    """Create or open a testnet wallet and derive a new Taproot key."""
-    wallet = wallet_create_or_open(name, keys=mnemonic, network="testnet")
-    # Derive a new default key (e.g., SegWit) for compatibility
-    key = wallet.new_key()
+    """Create or open a testnet wallet and derive or reuse the Taproot key."""
+    if mnemonic:
+        wallet = wallet_create_or_open(name, keys=mnemonic, network="testnet")
+    else:
+        wallet = wallet_create_or_open(name, network="testnet")
+    # Reuse the first existing key if it exists, else derive a new one
+    existing_keys = wallet.keys()
+    if existing_keys:
+        key = existing_keys[0]
+    else:
+        key = wallet.new_key()
     return wallet, key
 
 
 def main():
     wallet_name = "taproot_ninja_wallet"
     print(f"Initializing Taproot testnet wallet '{wallet_name}'...")
+
     wallet, key = create_taproot_wallet(wallet_name)
-    print(f"  Address:    {key.address}")
-    print(f"  Public key: {key.key_public.hex()}")
+    # Refresh and detect new incoming faucet funds
+    print("\nRefreshing wallet UTXOs to detect faucet funds...")
+    wallet.utxos_update()
+    balance_sats = wallet.balance()
+    # Convert satoshis to BTC
+    balance_btc = Decimal(balance_sats) / Decimal("1e8")
+    print(f"  Current balance: {balance_btc} BTC ({balance_sats} sats)")
+    if balance_sats == 0:
+        print(
+            "No funds detected. Check your faucet TX or wait for more confirmations.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    # Print public key for both WalletKey and DbKey, convert to hex if bytes
+    try:
+        pub = key.key_public
+    except AttributeError:
+        pub = key.public
+    if isinstance(pub, (bytes, bytearray)):
+        pub_hex = pub.hex()
+    else:
+        pub_hex = str(pub)
+    print(f"  Public key: {pub_hex}")
     print(
         "\nPlease fund this address using a testnet faucet, then press Enter to continue."
     )
     input()
 
     to_address = input("Enter a destination testnet address: ").strip()
-    amount = Decimal(input("Enter amount in BTC to send: ").strip())
-    print(f"\nSending {amount} BTC to {to_address}...")
+    amount_btc = Decimal(input("Enter amount in BTC to send: ").strip())
+    # Convert BTC amount to integer satoshis for wallet.send_to
+    amount_sats = int(amount_btc * Decimal("1e8"))
+    print(f"\nSending {amount_btc} BTC ({amount_sats} sats) to {to_address}...")
     try:
         # Use the correct 'fee' parameter (in satoshis) and enable immediate broadcast
-        tx = wallet.send_to(to_address, amount, fee=1000, broadcast=True)
+        tx = wallet.send_to(to_address, amount_sats, fee=1000, broadcast=True)
         print(f"Transaction broadcast! TXID: {tx.txid}")
         print(f"View on testnet explorer: https://mempool.space/testnet/tx/{tx.txid}")
     except Exception as e:
