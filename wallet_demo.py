@@ -13,10 +13,7 @@ def create_taproot_wallet(name: str, mnemonic: str = None):
         wallet = wallet_create_or_open(name, network="testnet")
     # Reuse the first existing key if it exists, else derive a new one
     existing_keys = wallet.keys()
-    if existing_keys:
-        key = existing_keys[0]
-    else:
-        key = wallet.new_key()
+    key = existing_keys[0] if existing_keys else wallet.new_key()
     return wallet, key
 
 
@@ -37,10 +34,7 @@ def main():
         pub = key.key_public
     except AttributeError:
         pub = key.public
-    if isinstance(pub, (bytes, bytearray)):
-        pub_hex = pub.hex()
-    else:
-        pub_hex = str(pub)
+    pub_hex = pub.hex() if isinstance(pub, (bytes, bytearray)) else str(pub)
     print(f"  Public key: {pub_hex}")
     print(f"  Address: {key.address}")
     print(

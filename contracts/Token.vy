@@ -9,7 +9,7 @@ event Transfer:
 name: public(String[64])
 symbol: public(String[32])
 decimals: public(uint256)
-balances: HashMap[address, uint256]
+balances: public(HashMap[address, uint256])
 
 @external
 def __init__():
