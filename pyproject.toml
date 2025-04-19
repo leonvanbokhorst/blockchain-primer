@@ -1,0 +1,30 @@
+[project]
+name = "blockchain-primer"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "ape>=0.4.0",
+    "ape-vyper>=0.8.1",
+    "bitcoinlib==0.7.3",
+    "certifi==2025.1.31",
+    "charset-normalizer==3.4.1",
+    "eth-ape>=0.8.4",
+    "fastecdsa==3.0.1",
+    "idna==3.10",
+    "matplotlib>=3.10.1",
+    "numpy==2.2.4",
+    "pandas>=2.2.3",
+    "pycryptodome==3.22.0",
+    "pytest>=8.3.5",
+    "requests==2.32.3",
+    "scikit-learn>=1.6.1",
+    "scipy>=1.15.2",
+    "sqlalchemy==2.0.40",
+    "torch>=2.6.0",
+    "torch-geometric>=2.6.1",
+    "typing-extensions==4.13.2",
+    "urllib3==2.4.0",
+    "web3>=6.20.1",
+]
