@@ -71,8 +71,8 @@ def train_gae(model, data, optimizer, epochs=100):
     return model
 
 
-def detect_anomalies(model, data, rev_node_map, threshold=0.1):
-    """Use trained GAE to detect anomalies and print recon scores."""
+def detect_anomalies(model, data, rev_node_map, threshold=0.1, num_std_devs=1.5):
+    """Use trained GAE to detect anomalies based on reconstruction score deviation."""
     # Ensure edge_index is of type LongTensor for PyG operations
     # data.edge_index = data.edge_index.long() # Already ensured in build_graph_data
     print(
@@ -86,38 +86,50 @@ def detect_anomalies(model, data, rev_node_map, threshold=0.1):
         error = (recon_weight - data.edge_weight).abs()
 
         print("\nEdge Reconstruction Analysis:", file=sys.stderr)
+        # Calculate statistics on reconstruction scores
+        mean_score = recon_weight.mean()
+        std_score = recon_weight.std()
+        lower_threshold = mean_score - num_std_devs * std_score
+        print(
+            f"Recon Score Stats: Mean={mean_score:.4f}, Std={std_score:.4f}, Threshold (Mean - {num_std_devs}*Std)={lower_threshold:.4f}",
+            file=sys.stderr,
+        )
+
         for idx in range(data.num_edges):
             src_idx = data.edge_index[0, idx].item()
             dst_idx = data.edge_index[1, idx].item()
             orig_weight = data.edge_weight[idx].item()
             recon_w = recon_weight[idx].item()
             err = error[idx].item()
-            # Print details for all edges, not just anomalies
+            # Print details for all edges
             print(
                 f"  - {rev_node_map[src_idx]} -> {rev_node_map[dst_idx]}: "
                 f"Orig: {orig_weight:.2f}, Recon Score: {recon_w:.4f}, Error: {err:.4f}",
                 file=sys.stderr,
             )
 
-        # Keep anomaly detection logic for reference, but maybe comment out/adjust threshold later
-        anomalous_indices = torch.where(error > threshold)[0]
+        # Anomaly detection based on low reconstruction score
+        anomalous_indices = torch.where(recon_weight < lower_threshold)[0]
         if anomalous_indices.numel() > 0:
-            print(f"\nAnomalies Detected (Error > {threshold}):", file=sys.stderr)
+            print(
+                f"\nAnomalies Detected (Recon Score < {lower_threshold:.4f}):",
+                file=sys.stderr,
+            )
             for idx in anomalous_indices.tolist():
                 src_idx = data.edge_index[0, idx].item()
                 dst_idx = data.edge_index[1, idx].item()
                 orig_weight = data.edge_weight[idx].item()
                 recon_w = recon_weight[idx].item()
-                err = error[idx].item()
+                err = error[idx].item()  # Keep error for context if needed
                 print(
                     f"  - {rev_node_map[src_idx]} -> {rev_node_map[dst_idx]}: "
-                    f"Orig: {orig_weight:.2f}, Recon Score: {recon_w:.4f}, Error: {err:.4f}",
+                    f"Orig: {orig_weight:.2f}, Recon Score: {recon_w:.4f} (< Threshold)",
                     file=sys.stderr,
                 )
 
 
 def main(
-    batch_interval_secs=60, train_epochs=100, anomaly_threshold=0.1, embedding_dim=16
+    batch_interval_secs=60, train_epochs=100, anomaly_num_std_devs=1.5, embedding_dim=16
 ):
     """Main loop: consume events, build graph, train, detect."""
     current_batch = []
@@ -183,7 +195,9 @@ def main(
 
             print("Training GAE model...", file=sys.stderr)
             model = train_gae(model, data, optimizer, epochs=train_epochs)
-            detect_anomalies(model, data, rev_node_map, threshold=anomaly_threshold)
+            detect_anomalies(
+                model, data, rev_node_map, num_std_devs=anomaly_num_std_devs
+            )
 
             # Reset for next batch
             current_batch = []
